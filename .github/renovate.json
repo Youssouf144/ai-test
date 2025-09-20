@@ -1,0 +1,48 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    "docker:enableMajor",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separatePatchReleases"
+  ],
+  "schedule": ["before 6am on monday"],
+  "timezone": "UTC",
+  "labels": ["dependencies"],
+  "assignees": ["@Youssouf144"],
+  "reviewers": ["@Youssouf144"],
+  "packageRules": [
+    {
+      "matchDepTypes": ["devDependencies"],
+      "automerge": true,
+      "automergeType": "pr",
+      "requiredStatusChecks": null
+    },
+    {
+      "matchPackageNames": ["react", "react-dom", "next"],
+      "groupName": "React ecosystem",
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "matchPackageNames": ["@types/*"],
+      "groupName": "TypeScript definitions",
+      "automerge": true
+    },
+    {
+      "matchPackageNames": ["eslint*", "prettier*"],
+      "groupName": "Linting and formatting",
+      "automerge": true
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"]
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2
+}

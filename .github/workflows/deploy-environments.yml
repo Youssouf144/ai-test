@@ -1,0 +1,181 @@
+name: Multi-Environment Deployment
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - development
+        - staging
+        - production
+
+jobs:
+  deploy-development:
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'development')
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build for development
+      run: npm run build
+      env:
+        NODE_ENV: development
+        NEXT_PUBLIC_API_URL: ${{ secrets.DEV_API_URL }}
+
+    - name: Deploy to Development
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--env NODE_ENV=development'
+
+    - name: Run smoke tests
+      run: npm run test:smoke
+      env:
+        TEST_URL: ${{ steps.vercel.outputs.preview-url }}
+
+  deploy-staging:
+    if: github.ref == 'refs/heads/staging' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm run test
+
+    - name: Build for staging
+      run: npm run build
+      env:
+        NODE_ENV: staging
+        NEXT_PUBLIC_API_URL: ${{ secrets.STAGING_API_URL }}
+
+    - name: Deploy to Staging
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--env NODE_ENV=staging'
+
+    - name: Run integration tests
+      run: npm run test:integration
+      env:
+        TEST_URL: ${{ steps.vercel.outputs.preview-url }}
+
+    - name: Performance testing
+      run: npm run test:performance
+      env:
+        TEST_URL: ${{ steps.vercel.outputs.preview-url }}
+
+  deploy-production:
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run full test suite
+      run: |
+        npm run test
+        npm run test:e2e
+
+    - name: Security scan
+      run: npm audit --audit-level=high
+
+    - name: Build for production
+      run: npm run build
+      env:
+        NODE_ENV: production
+        NEXT_PUBLIC_API_URL: ${{ secrets.PROD_API_URL }}
+
+    - name: Deploy to Production
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--prod'
+
+    - name: Health check
+      run: |
+        sleep 30
+        curl -f ${{ secrets.PROD_URL }}/health || exit 1
+
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      with:
+        status: custom
+        custom_payload: |
+          {
+            text: "🚀 Production deployment successful!",
+            attachments: [{
+              color: 'good',
+              fields: [{
+                title: 'Environment',
+                value: 'Production',
+                short: true
+              }, {
+                title: 'Version',
+                value: '${{ github.sha }}',
+                short: true
+              }]
+            }]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  rollback:
+    if: failure()
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Rollback deployment
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--prod --force'

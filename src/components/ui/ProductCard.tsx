@@ -1,3 +1,5 @@
+"use client";
+
 import { Product } from "@/types";
 
 interface ProductCardProps extends Product {

@@ -1,3 +1,5 @@
+"use client";
+
 interface HeroProps {
   title: string;
   subtitle: string;

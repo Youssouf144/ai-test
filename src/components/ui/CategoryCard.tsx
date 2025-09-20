@@ -1,3 +1,5 @@
+"use client";
+
 import { Category } from "@/types";
 
 interface CategoryCardProps extends Category {

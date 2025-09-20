@@ -1,10 +1,12 @@
+"use client";
+
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import Hero from "@/components/ui/Hero";
 import CategoryCard from "@/components/ui/CategoryCard";
 import ProductCard from "@/components/ui/ProductCard";
 import { categories } from "@/data/categories";
-import { featuredProducts } from "@/data/products";
+import { featuredProducts, getValidatedProducts } from "@/data/products";
 
 export default function Home() {
   const handleShopNow = () => {
